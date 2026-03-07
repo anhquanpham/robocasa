@@ -802,7 +802,9 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
         # setup object locations
         try:
             self.placement_initializer = EnvUtils._get_placement_initializer(
-                self, self.object_cfgs
+                self,
+                self.object_cfgs,
+                use_omni_placement=getattr(self, "_using_omni_placement", False),
             )
         except PlacementError as e:
             if macros.VERBOSE:
@@ -851,8 +853,10 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
         """
         # add objects
         self.objects = {}
-        if "object_cfgs" in self._ep_meta:
-            self.object_cfgs = self._ep_meta["object_cfgs"]
+        ep_meta = getattr(self, "_ep_meta", {})
+        self._using_omni_placement = "object_cfgs" not in ep_meta
+        if "object_cfgs" in ep_meta:
+            self.object_cfgs = ep_meta["object_cfgs"]
             for obj_num, cfg in enumerate(self.object_cfgs):
                 if "name" not in cfg:
                     cfg["name"] = "obj_{}".format(obj_num + 1)

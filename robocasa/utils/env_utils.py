@@ -895,7 +895,7 @@ def get_single_fixture_sampler(env, cfg, z_offset=0.003):
         return _get_placement_initializer(env, [cfg], z_offset)
 
 
-def _get_placement_initializer(env, cfg_list, z_offset=0.01):
+def _get_placement_initializer(env, cfg_list, z_offset=0.01, use_omni_placement=False):
     """
     Creates a placement initializer for the objects/fixtures based on the specifications in the configurations list.
 
@@ -903,6 +903,9 @@ def _get_placement_initializer(env, cfg_list, z_offset=0.01):
         cfg_list (list): list of object configurations
 
         z_offset (float): offset in z direction if not specified in cfg
+
+        use_omni_placement (bool): if True, use robocasa_omni-style placement (no min_size filtering).
+            Used for single_stage/multi_stage tasks from robocasa_omni.
 
     Returns:
         SequentialCompositeSampler: placement initializer
@@ -992,7 +995,8 @@ def _get_placement_initializer(env, cfg_list, z_offset=0.01):
                 aux_x_offset = mj_obj.anchor_offset[0]
 
         ensure_object_boundary_in_range = placement.get(
-            "ensure_object_boundary_in_range", True
+            "ensure_object_boundary_in_range",
+            False if use_omni_placement else True,
         )
         ensure_valid_placement = placement.get("ensure_valid_placement", True)
         ensure_valid_auxiliary_placement = placement.get(
@@ -1062,7 +1066,8 @@ def _get_placement_initializer(env, cfg_list, z_offset=0.01):
                     reset_region = cfg["reset_region"]
                 else:
                     if (
-                        ensure_object_boundary_in_range
+                        not use_omni_placement
+                        and ensure_object_boundary_in_range
                         and ensure_valid_placement
                         and rotation_axis == "z"
                     ):
@@ -1333,8 +1338,12 @@ def init_robot_base_pose(env):
     helper function to initialize robot base pose
     """
     # set robot position
+    # Match robocasa_omni: use init_robot_base_pos (fixture from task, e.g. stove) when set.
+    # robocasa365 uses init_robot_base_ref (str from __init__); tasks set init_robot_base_pos in _setup_kitchen_references.
     if env.init_robot_base_ref is not None:
         ref_fixture = env.get_fixture(env.init_robot_base_ref)
+    elif hasattr(env, "init_robot_base_pos") and env.init_robot_base_pos is not None:
+        ref_fixture = env.get_fixture(env.init_robot_base_pos)
     else:
         fixtures = list(env.fixtures.values())
         valid_ref_fixture_classes = [

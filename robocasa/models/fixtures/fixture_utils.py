@@ -116,6 +116,29 @@ def fixture_is_type(fixture, fixture_type):
         return isinstance(fixture, Drawer)
     elif fixture_type == FixtureType.WINDOW:
         return isinstance(fixture, Window)
+    # From robocasa_omni (for single_stage/multi_stage compatibility)
+    elif fixture_type == FixtureType.CABINET_TOP:
+        valid_classes = [SingleCabinet, HingeCabinet, OpenCabinet]
+        cls_check = any([isinstance(fixture, cls) for cls in valid_classes])
+        if not cls_check:
+            return False
+        if "stack" in fixture.name:
+            return False
+        if getattr(fixture, "is_corner_cab", False) is True:
+            return False
+        reset_regions = fixture.get_reset_regions(z_range=(1.0, 1.50))
+        return len(reset_regions) > 0
+    elif fixture_type in [
+        FixtureType.DOOR_TOP_HINGE,
+        FixtureType.DOOR_TOP_HINGE_SINGLE,
+        FixtureType.DOOR_TOP_HINGE_DOUBLE,
+        FixtureType.DOOR_HINGE,
+        FixtureType.DOOR_HINGE_SINGLE,
+        FixtureType.DOOR_HINGE_DOUBLE,
+    ]:
+        return isinstance(fixture, (SingleCabinet, HingeCabinet))
+    elif fixture_type == FixtureType.DOOR:
+        return isinstance(fixture, (SingleCabinet, HingeCabinet))
     else:
         raise ValueError
 

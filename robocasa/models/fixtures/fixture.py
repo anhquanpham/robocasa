@@ -64,6 +64,15 @@ class FixtureType(IntEnum):
     WINDOW = 25
     DISH_RACK = 26
     COUNTER_NON_DINING = 27
+    # From robocasa_omni (for single_stage/multi_stage compatibility)
+    DOOR = 28
+    DOOR_HINGE = 29
+    DOOR_HINGE_SINGLE = 30
+    DOOR_HINGE_DOUBLE = 31
+    DOOR_TOP_HINGE = 32
+    DOOR_TOP_HINGE_SINGLE = 33
+    DOOR_TOP_HINGE_DOUBLE = 34
+    CABINET_TOP = 35
 
 
 class Fixture(MujocoXMLObjectRobocasa):

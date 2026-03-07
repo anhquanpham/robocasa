@@ -61,20 +61,24 @@ class Stove(Fixture):
             dict: dictionary of reset regions
         """
         regions = dict()
+        requested_locs = locs
 
         if locs is None:
             locs = STOVE_LOCATIONS
         for location in locs:
-            site = self.worldbody.find(
-                "./body/body/site[@name='{}burner_{}_place_site']".format(
-                    self.naming_prefix, location
-                )
-            )
+            site_name = "{}burner_{}_place_site".format(self.naming_prefix, location)
+            site = self.worldbody.find("./body/body/site[@name='{}']".format(site_name))
+            if site is None:
+                site_name = "{}burner_on_{}".format(self.naming_prefix, location)
+                site = self.worldbody.find("./body/body/site[@name='{}']".format(site_name))
+            # Fallback: fixture XML may use unprefixed names (before merge)
             if site is None:
                 site = self.worldbody.find(
-                    "./body/body/site[@name='{}burner_on_{}']".format(
-                        self.naming_prefix, location
-                    )
+                    "./body/body/site[@name='burner_{}_place_site']".format(location)
+                )
+            if site is None:
+                site = self.worldbody.find(
+                    "./body/body/site[@name='burner_on_{}']".format(location)
                 )
             if site is None:
                 continue
@@ -83,6 +87,11 @@ class Stove(Fixture):
                 "offset": burner_pos,
                 "size": [0.10, 0.10],
             }
+
+        # Fallback for robocasa_omni tasks: requested locs may not exist in some stove models.
+        # Use all locations if none found.
+        if len(regions) == 0 and requested_locs is not None:
+            return self.get_reset_regions(env, locs=None)
 
         return regions
 
