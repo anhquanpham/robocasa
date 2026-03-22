@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import robosuite
 import robosuite.utils.transform_utils as T
+from robosuite.utils.package_root import inner_pkg_root
 from robosuite.models.objects import MujocoXMLObject
 from robosuite.models.base import MujocoXML
 from robosuite.utils.mjcf_utils import array_to_string, string_to_array, find_elements
@@ -320,7 +321,7 @@ class MJCFObject(MujocoXMLObjectRobocasa):
         there is an error with the "max" operation)
         """
 
-        path = os.path.split(robosuite.__file__)[0]
+        path = str(inner_pkg_root())
         path_split = path.split("/")
 
         # replace mesh and texture file paths

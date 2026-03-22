@@ -8,6 +8,7 @@ import mujoco
 import robocasa
 import robosuite
 from robosuite import load_controller_config
+from robosuite.environments.base import make as robosuite_make
 from termcolor import colored
 
 DEFAULT_SEED = 3

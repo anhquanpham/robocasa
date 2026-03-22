@@ -7,6 +7,7 @@ import string
 import xml.etree.ElementTree as ET
 
 import robosuite
+from robosuite.utils.package_root import inner_pkg_root
 
 from robocasa.models.objects.objects import MujocoXMLObjectRobocasa
 from robosuite.utils.mjcf_utils import array_to_string, string_to_array
@@ -23,7 +24,7 @@ def postprocess_model_xml(xml_str):
     if necessary.
     """
 
-    path = os.path.split(robosuite.__file__)[0]
+    path = str(inner_pkg_root())
     path_split = path.split("/")
 
     # replace mesh and texture file paths

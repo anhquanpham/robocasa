@@ -10,6 +10,8 @@ from termcolor import colored
 import traceback
 
 import robosuite
+from robosuite.environments.base import make as robosuite_make
+
 import robocasa
 
 from robocasa.scripts.dataset_scripts.playback_utils import (

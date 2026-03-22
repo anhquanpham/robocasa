@@ -8,6 +8,8 @@ import numpy as np
 from copy import deepcopy
 
 import robosuite
+from robosuite.environments.base import make as robosuite_make
+
 import robocasa.utils.robomimic.robomimic_obs_utils as ObsUtils
 
 

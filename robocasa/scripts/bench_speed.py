@@ -13,6 +13,7 @@ from tianshou.env import SubprocVectorEnv
 
 import robosuite as suite
 from robosuite.controllers import load_composite_controller_config
+from robosuite.environments.base import make as robosuite_make
 from robocasa import ALL_KITCHEN_ENVIRONMENTS
 import robocasa
 

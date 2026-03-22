@@ -12,6 +12,8 @@ import mujoco.viewer
 import numpy as np
 import sys
 import robosuite
+from robosuite.utils.package_root import inner_pkg_root
+
 import robocasa
 from PIL import Image
 from robosuite.utils.binding_utils import MjRenderContextOffscreen, MjSim
@@ -33,7 +35,7 @@ def edit_model_xml(xml_str):
         str: Edited xml file as string
     """
 
-    path = os.path.split(robosuite.__file__)[0]
+    path = str(inner_pkg_root())
     path_split = path.split("/")
 
     # replace mesh and texture file paths

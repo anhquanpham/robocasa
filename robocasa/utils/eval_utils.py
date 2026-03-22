@@ -6,6 +6,8 @@ from robocasa.scripts.playback_dataset import get_env_metadata_from_dataset
 from robosuite import load_controller_config
 import os
 import robosuite
+from robosuite.environments.base import make as robosuite_make
+
 import imageio
 import numpy as np
 from tqdm import tqdm

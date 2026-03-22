@@ -15,6 +15,10 @@ from robosuite.utils.mjcf_utils import (
 import xml.etree.ElementTree as ET
 import os
 import robosuite
+# PEP 660 editable installs may expose a site-packages stub as `robosuite` without running the
+# real package __init__, so `robosuite.make` is missing; `make` still lives on environments.base.
+from robosuite.environments.base import make as robosuite_make
+
 import robocasa
 import yaml
 import imageio
@@ -127,7 +131,7 @@ def create_env(
         **kwargs,  # additional env keyword args
     )
 
-    env = robosuite.make(**env_kwargs)
+    env = robosuite_make(**env_kwargs)
     return env
 
 

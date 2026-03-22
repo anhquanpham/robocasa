@@ -21,6 +21,7 @@ import imageio
 import mujoco
 import numpy as np
 import robosuite
+from robosuite.environments.base import make as robosuite_make
 
 # from robosuite import load_controller_config
 from robosuite.controllers import load_composite_controller_config

@@ -15,6 +15,7 @@ import robocasa.utils.model_zoo.log_utils as LogUtils
 import robocasa.utils.model_zoo.mtl_utils as MtlUtils
 
 from robosuite.utils.mjcf_utils import array_to_string, string_to_array
+from robosuite.utils.package_root import inner_pkg_root
 
 
 def parse_model_info(
@@ -602,7 +603,7 @@ def generate_mjcf(
         texture.attrib["file"] = "/".join(texture_path.split("/")[-1:])
     else:
         texture.attrib["file"] = os.path.join(
-            os.path.dirname(robosuite.__file__), "models/assets/textures/ceramic.png"
+            str(inner_pkg_root()), "models/assets/textures/ceramic.png"
         )
     material = asset.find("material")
     for k in ["name", "texture"]:

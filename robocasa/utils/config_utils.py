@@ -3,6 +3,7 @@ import os
 import pathlib
 import robosuite
 from robosuite.controllers import load_composite_controller_config
+from robosuite.utils.package_root import inner_pkg_root
 
 
 def is_stale_controller_config(config: dict):
@@ -45,7 +46,7 @@ def refactor_composite_controller_config(controller_config, robot_type, arms):
     if not is_stale_controller_config(controller_config):
         return controller_config
 
-    config_dir = pathlib.Path(robosuite.__file__).parent / "controllers/config/robots/"
+    config_dir = inner_pkg_root() / "controllers/config/robots/"
     name = robot_type.lower()
     configs = os.listdir(config_dir)
     if f"default_{name}.json" in configs:

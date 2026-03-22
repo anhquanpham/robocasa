@@ -1014,7 +1014,12 @@ assert numpy.__version__ in [
 
 import robosuite
 
-robosuite_version = [int(e) for e in robosuite.__version__.split(".")]
+_rs_ver = getattr(robosuite, "__version__", None)
+if _rs_ver is None:
+    import importlib.metadata
+
+    _rs_ver = importlib.metadata.version("robosuite")
+robosuite_version = [int(e) for e in _rs_ver.split(".")]
 robosuite_check = True
 if robosuite_version[0] < 1:
     robosuite_check = False

@@ -10,6 +10,8 @@ from termcolor import colored
 import traceback
 
 import robosuite
+from robosuite.environments.base import make as robosuite_make
+
 import robocasa
 from pathlib import Path
 import robocasa.utils.lerobot_utils as LU

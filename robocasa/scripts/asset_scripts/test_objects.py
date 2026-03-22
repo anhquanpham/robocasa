@@ -6,6 +6,7 @@ import traceback
 import numpy as np
 import robosuite as suite
 from robosuite import load_controller_config
+from robosuite.environments.base import make as robosuite_make
 from tqdm import tqdm
 
 
