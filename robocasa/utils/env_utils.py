@@ -73,6 +73,8 @@ def create_env(
     seed=None,
     render_onscreen=False,
     translucent_robot=False,
+    # If True and ``base_types`` is not set, use MJCF-locked Omron base (same action size as mobile).
+    fixed_robot_base=False,
     # robocasa-related configs
     split=None,
     obj_instance_split=None,
@@ -107,6 +109,9 @@ def create_env(
         pass
     else:
         raise ValueError('split must be either {None, "all", "pretrain", "target"}')
+
+    if fixed_robot_base:
+        kwargs.setdefault("base_types", "OmronMobileBaseFixed")
 
     env_kwargs = dict(
         env_name=env_name,

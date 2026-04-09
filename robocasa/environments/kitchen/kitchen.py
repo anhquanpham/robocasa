@@ -94,7 +94,8 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
             Default is "default", which is the default base associated with the robot(s) the 'robots' specification.
             None results in no base, and any other (valid) model overrides the default base. Should either be
             single str if same base type is to be used for all robots or else it should be a list of the same
-            length as "robots" param
+            length as "robots" param. For PandaOmron, ``"OmronMobileBaseFixed"`` uses the same action layout as
+            ``OmronMobileBase`` but locks planar base joints in MJCF (reduces passive motion from contact).
 
         gripper_types (None or str or list of str): type of gripper, used to instantiate
             gripper models from gripper factory. Default is "default", which is the default grippers(s) associated
