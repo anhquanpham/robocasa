@@ -20,15 +20,18 @@ from robocasa.utils.env_utils import create_env
 class PandaOmronKeyConverter:
     @classmethod
     def get_camera_config(cls):
+        # Fourth camera (frontview) supports omniguide-style overhead / third guidance view.
         mapped_names = [
             "video.robot0_agentview_left",
             "video.robot0_agentview_right",
             "video.robot0_eye_in_hand",
+            "video.robot0_frontview",
         ]
         camera_names = [
             "robot0_agentview_left",
             "robot0_agentview_right",
             "robot0_eye_in_hand",
+            "robot0_frontview",
         ]
         camera_widths, camera_heights = 256, 256
         return mapped_names, camera_names, camera_widths, camera_heights

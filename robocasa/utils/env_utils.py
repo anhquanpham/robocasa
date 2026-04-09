@@ -66,6 +66,7 @@ def create_env(
         "robot0_agentview_left",
         "robot0_agentview_right",
         "robot0_eye_in_hand",
+        "robot0_frontview",
     ],
     camera_widths=128,
     camera_heights=128,
