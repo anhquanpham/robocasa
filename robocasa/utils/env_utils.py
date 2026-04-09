@@ -83,21 +83,44 @@ def create_env(
         robot=robots if isinstance(robots, str) else robots[0],
     )
 
+    # When ``pin_all_except_object_placement`` is passed (Kitchen), do not expand split into
+    # multi-layout/style ids—leave layout unset so Kitchen can pin to (1, 1). Still set
+    # obj_instance_split from split for object registry filtering.
+    pin_all = kwargs.get("pin_all_except_object_placement", False)
+    _layout_unset = dict(
+        layout_ids=None, style_ids=None, layout_and_style_ids=None
+    )
+
     if split == "target":
         obj_instance_split = "target"
-        layout_ids = None
-        style_ids = None
-        layout_and_style_ids = list(zip(range(1, 11), range(1, 11)))
+        if pin_all:
+            layout_ids = _layout_unset["layout_ids"]
+            style_ids = _layout_unset["style_ids"]
+            layout_and_style_ids = _layout_unset["layout_and_style_ids"]
+        else:
+            layout_ids = None
+            style_ids = None
+            layout_and_style_ids = list(zip(range(1, 11), range(1, 11)))
     elif split == "pretrain":
         obj_instance_split = "pretrain"
-        layout_ids = -2
-        style_ids = -2
-        layout_and_style_ids = None
+        if pin_all:
+            layout_ids = _layout_unset["layout_ids"]
+            style_ids = _layout_unset["style_ids"]
+            layout_and_style_ids = _layout_unset["layout_and_style_ids"]
+        else:
+            layout_ids = -2
+            style_ids = -2
+            layout_and_style_ids = None
     elif split == "all":
         obj_instance_split = None
-        layout_ids = -3
-        style_ids = -3
-        layout_and_style_ids = None
+        if pin_all:
+            layout_ids = _layout_unset["layout_ids"]
+            style_ids = _layout_unset["style_ids"]
+            layout_and_style_ids = _layout_unset["layout_and_style_ids"]
+        else:
+            layout_ids = -3
+            style_ids = -3
+            layout_and_style_ids = None
     elif split is None:
         pass
     else:
@@ -1354,12 +1377,24 @@ def init_robot_base_pose(env):
             "Fridge",
             "Dishwasher",
         ]
-        while True:
-            ref_fixture = env.rng.choice(fixtures)
-            fxtr_class = type(ref_fixture).__name__
-            if fxtr_class not in valid_ref_fixture_classes:
-                continue
-            break
+        if getattr(env, "deterministic_fixture_selection", False):
+            valid = [
+                f
+                for f in fixtures
+                if type(f).__name__ in valid_ref_fixture_classes
+            ]
+            if len(valid) == 0:
+                raise RuntimeError(
+                    "deterministic_fixture_selection: no valid fixture for robot base init"
+                )
+            ref_fixture = sorted(valid, key=lambda f: f.name)[0]
+        else:
+            while True:
+                ref_fixture = env.rng.choice(fixtures)
+                fxtr_class = type(ref_fixture).__name__
+                if fxtr_class not in valid_ref_fixture_classes:
+                    continue
+                break
 
     ref_object = None
     for cfg in env.object_cfgs:

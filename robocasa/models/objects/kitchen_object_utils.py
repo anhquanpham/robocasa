@@ -8,8 +8,202 @@ from robosuite.utils.mjcf_utils import find_elements, string_to_array
 
 import robocasa
 from robocasa.models.objects.kitchen_objects import OBJ_CATEGORIES, OBJ_GROUPS
+from robocasa.utils.errors import SamplingError
 
 BASE_ASSET_ZOO_PATH = os.path.join(robocasa.models.assets_root, "objects")
+
+
+def _apply_object_scale(mjcf_kwargs, object_scale):
+    if object_scale is None:
+        return
+    if isinstance(object_scale, float):
+        if isinstance(mjcf_kwargs["scale"], float):
+            mjcf_kwargs["scale"] *= object_scale
+        else:
+            mjcf_kwargs["scale"] = [e * object_scale for e in mjcf_kwargs["scale"]]
+    else:
+        if isinstance(mjcf_kwargs["scale"], float):
+            mjcf_kwargs["scale"] = [mjcf_kwargs["scale"] for _ in range(3)]
+        mjcf_kwargs["scale"] = [
+            mjcf_kwargs["scale"][ind] * object_scale[ind] for ind in range(3)
+        ]
+
+
+def _build_valid_categories_for_sample(
+    groups,
+    exclude_groups,
+    graspable,
+    washable,
+    microwavable,
+    cookable,
+    fridgable,
+    freezable,
+    dishwashable,
+    obj_registries,
+):
+    if not isinstance(groups, tuple) and not isinstance(groups, list):
+        groups = [groups]
+
+    if exclude_groups is None:
+        exclude_groups = []
+    if not isinstance(exclude_groups, tuple) and not isinstance(exclude_groups, list):
+        exclude_groups = [exclude_groups]
+
+    invalid_categories = []
+    for g in exclude_groups:
+        for cat in OBJ_GROUPS[g]:
+            invalid_categories.append(cat)
+
+    valid_categories = []
+    for g in groups:
+        for cat in OBJ_GROUPS[g]:
+            if cat in valid_categories:
+                continue
+            if cat in invalid_categories:
+                continue
+
+            cat_in_any_reg = np.any(
+                [reg in OBJ_CATEGORIES[cat] for reg in obj_registries]
+            )
+            if not cat_in_any_reg:
+                continue
+
+            invalid = False
+            for reg in obj_registries:
+                if reg not in OBJ_CATEGORIES[cat]:
+                    continue
+                cat_meta = OBJ_CATEGORIES[cat][reg]
+                if graspable is True and cat_meta.graspable is not True:
+                    invalid = True
+                if washable is True and cat_meta.washable is not True:
+                    invalid = True
+                if microwavable is True and cat_meta.microwavable is not True:
+                    invalid = True
+                if cookable is True and cat_meta.cookable is not True:
+                    invalid = True
+                if fridgable is True and cat_meta.fridgable is not True:
+                    invalid = True
+                if freezable is True and cat_meta.freezable is not True:
+                    invalid = True
+                if dishwashable is True and cat_meta.dishwashable is not True:
+                    invalid = True
+
+            if invalid:
+                continue
+
+            valid_categories.append(cat)
+
+    return groups, valid_categories
+
+
+def _iter_lexicographic_kitchen_objects(
+    groups,
+    exclude_groups=None,
+    graspable=None,
+    washable=None,
+    microwavable=None,
+    cookable=None,
+    fridgable=None,
+    freezable=None,
+    dishwashable=None,
+    obj_registries=("objaverse",),
+    split=None,
+    object_scale=None,
+    rotate_upright=False,
+):
+    """
+    Yield (mjcf_kwargs, info) in stable lexicographic order: sorted category name,
+    registry order as given in obj_registries, sorted mjcf path within each registry.
+    """
+    if isinstance(groups, str) and groups.endswith(".xml"):
+        mjcf_path = groups
+        model_xml_path = os.path.join(os.path.dirname(mjcf_path), "model.xml")
+        mjcf_kwargs = dict()
+        cat = None
+        obj_found = False
+        for cand_cat in sorted(OBJ_CATEGORIES.keys()):
+            for reg in obj_registries:
+                if reg not in OBJ_CATEGORIES[cand_cat]:
+                    continue
+                if model_xml_path in OBJ_CATEGORIES[cand_cat][reg].mjcf_paths:
+                    mjcf_kwargs = OBJ_CATEGORIES[cand_cat][reg].get_mjcf_kwargs()
+                    cat = cand_cat
+                    obj_found = True
+                    break
+            if obj_found:
+                break
+        if obj_found is False:
+            raise ValueError
+        mjcf_kwargs["mjcf_path"] = mjcf_path
+        _apply_object_scale(mjcf_kwargs, object_scale)
+        groups_containing_sampled_obj = []
+        for group, group_cats in OBJ_GROUPS.items():
+            if cat in group_cats:
+                groups_containing_sampled_obj.append(group)
+        info = {
+            "groups_containing_sampled_obj": groups_containing_sampled_obj,
+            "groups": groups,
+            "cat": cat,
+            "split": split,
+            "mjcf_path": mjcf_path,
+        }
+        yield mjcf_kwargs, info
+        return
+
+    groups, valid_categories = _build_valid_categories_for_sample(
+        groups,
+        exclude_groups,
+        graspable,
+        washable,
+        microwavable,
+        cookable,
+        fridgable,
+        freezable,
+        dishwashable,
+        obj_registries,
+    )
+    if len(valid_categories) == 0:
+        return
+
+    for cat in sorted(valid_categories):
+        choices = {reg: [] for reg in obj_registries}
+        for reg in obj_registries:
+            if reg not in OBJ_CATEGORIES[cat]:
+                choices[reg] = []
+                continue
+            reg_choices = deepcopy(OBJ_CATEGORIES[cat][reg].mjcf_paths)
+            if split is not None:
+                split_th = max(
+                    len(reg_choices) - 5, int(math.ceil(len(reg_choices) / 2))
+                )
+                if split == "pretrain":
+                    reg_choices = reg_choices[:split_th]
+                elif split == "target":
+                    reg_choices = reg_choices[split_th:]
+                else:
+                    raise ValueError
+            choices[reg] = reg_choices
+
+        for reg in obj_registries:
+            for mjcf_path in sorted(choices[reg]):
+                path = mjcf_path
+                if rotate_upright:
+                    path = path.replace("model.xml", "model_upright.xml")
+                mjcf_kwargs = OBJ_CATEGORIES[cat][reg].get_mjcf_kwargs()
+                mjcf_kwargs["mjcf_path"] = path
+                _apply_object_scale(mjcf_kwargs, object_scale)
+                groups_containing_sampled_obj = []
+                for group, group_cats in OBJ_GROUPS.items():
+                    if cat in group_cats:
+                        groups_containing_sampled_obj.append(group)
+                info = {
+                    "groups_containing_sampled_obj": groups_containing_sampled_obj,
+                    "groups": groups,
+                    "cat": cat,
+                    "split": split,
+                    "mjcf_path": path,
+                }
+                yield mjcf_kwargs, info
 
 
 class ObjCat:
@@ -214,6 +408,7 @@ def sample_kitchen_object(
     max_size=(None, None, None),
     object_scale=None,
     rotate_upright=False,
+    lexicographic_object_order=False,
 ):
     """
     Sample a kitchen object from the specified groups and within max_size bounds.
@@ -250,6 +445,8 @@ def sample_kitchen_object(
 
         object_scale (float): scale of the object. If set will multiply the scale of the sampled object by this value
 
+        lexicographic_object_order (bool): if True, return the first object instance in deterministic
+            lexicographic order (sorted category name, registry order, sorted mjcf path) that satisfies max_size.
 
     Returns:
         dict: kwargs to apply to the MJCF model for the sampled object
@@ -257,6 +454,46 @@ def sample_kitchen_object(
         dict: info about the sampled object - the path of the mjcf, groups which the object's category belongs to, the category of the object
               the sampling split the object came from, and the groups the object was sampled from
     """
+
+    def _meets_max_size(mjcf_kwargs, info):
+        mjcf_path = info["mjcf_path"]
+        tree = ET.parse(mjcf_path)
+        root = tree.getroot()
+        half_size = string_to_array(
+            find_elements(root=root, tags="geom", attribs={"name": "reg_bbox"}).get(
+                "size"
+            )
+        )
+        scale = mjcf_kwargs["scale"]
+        obj_size = (half_size * 2) * scale
+
+        for i in range(3):
+            if max_size[i] is not None and obj_size[i] > max_size[i]:
+                return False
+        return True
+
+    if lexicographic_object_order:
+        for mjcf_kwargs, info in _iter_lexicographic_kitchen_objects(
+            groups=groups,
+            exclude_groups=exclude_groups,
+            graspable=graspable,
+            washable=washable,
+            microwavable=microwavable,
+            cookable=cookable,
+            fridgable=fridgable,
+            freezable=freezable,
+            dishwashable=dishwashable,
+            obj_registries=obj_registries,
+            split=split,
+            object_scale=object_scale,
+            rotate_upright=rotate_upright,
+        ):
+            if _meets_max_size(mjcf_kwargs, info):
+                return mjcf_kwargs, info
+        raise SamplingError(
+            "lexicographic_object_order: no object instance satisfied max_size filters"
+        )
+
     valid_object_sampled = False
     while valid_object_sampled is False:
         mjcf_kwargs, info = sample_kitchen_object_helper(
@@ -277,22 +514,7 @@ def sample_kitchen_object(
             rotate_upright=rotate_upright,
         )
 
-        # check if object size is within bounds
-        mjcf_path = info["mjcf_path"]
-        tree = ET.parse(mjcf_path)
-        root = tree.getroot()
-        half_size = string_to_array(
-            find_elements(root=root, tags="geom", attribs={"name": "reg_bbox"}).get(
-                "size"
-            )
-        )
-        scale = mjcf_kwargs["scale"]
-        obj_size = (half_size * 2) * scale
-
-        valid_object_sampled = True
-        for i in range(3):
-            if max_size[i] is not None and obj_size[i] > max_size[i]:
-                valid_object_sampled = False
+        valid_object_sampled = _meets_max_size(mjcf_kwargs, info)
 
     return mjcf_kwargs, info
 
@@ -381,61 +603,18 @@ def sample_kitchen_object_helper(
             raise ValueError
         mjcf_kwargs["mjcf_path"] = mjcf_path
     else:
-        if not isinstance(groups, tuple) and not isinstance(groups, list):
-            groups = [groups]
-
-        if exclude_groups is None:
-            exclude_groups = []
-        if not isinstance(exclude_groups, tuple) and not isinstance(
-            exclude_groups, list
-        ):
-            exclude_groups = [exclude_groups]
-
-        invalid_categories = []
-        for g in exclude_groups:
-            for cat in OBJ_GROUPS[g]:
-                invalid_categories.append(cat)
-
-        valid_categories = []
-        for g in groups:
-            for cat in OBJ_GROUPS[g]:
-                # don't repeat if already added
-                if cat in valid_categories:
-                    continue
-                if cat in invalid_categories:
-                    continue
-
-                # don't include if category not represented in any registry
-                cat_in_any_reg = np.any(
-                    [reg in OBJ_CATEGORIES[cat] for reg in obj_registries]
-                )
-                if not cat_in_any_reg:
-                    continue
-
-                invalid = False
-                for reg in obj_registries:
-                    if reg not in OBJ_CATEGORIES[cat]:
-                        continue
-                    cat_meta = OBJ_CATEGORIES[cat][reg]
-                    if graspable is True and cat_meta.graspable is not True:
-                        invalid = True
-                    if washable is True and cat_meta.washable is not True:
-                        invalid = True
-                    if microwavable is True and cat_meta.microwavable is not True:
-                        invalid = True
-                    if cookable is True and cat_meta.cookable is not True:
-                        invalid = True
-                    if fridgable is True and cat_meta.fridgable is not True:
-                        invalid = True
-                    if freezable is True and cat_meta.freezable is not True:
-                        invalid = True
-                    if dishwashable is True and cat_meta.dishwashable is not True:
-                        invalid = True
-
-                if invalid:
-                    continue
-
-                valid_categories.append(cat)
+        groups, valid_categories = _build_valid_categories_for_sample(
+            groups,
+            exclude_groups,
+            graspable,
+            washable,
+            microwavable,
+            cookable,
+            fridgable,
+            freezable,
+            dishwashable,
+            obj_registries,
+        )
 
         cat = rng.choice(valid_categories)
 
@@ -472,18 +651,7 @@ def sample_kitchen_object_helper(
         mjcf_kwargs = OBJ_CATEGORIES[cat][chosen_reg].get_mjcf_kwargs()
         mjcf_kwargs["mjcf_path"] = mjcf_path
 
-    if object_scale is not None:
-        if isinstance(object_scale, float):
-            if isinstance(mjcf_kwargs["scale"], float):
-                mjcf_kwargs["scale"] *= object_scale
-            else:
-                mjcf_kwargs["scale"] = [e * object_scale for e in mjcf_kwargs["scale"]]
-        else:
-            if isinstance(mjcf_kwargs["scale"], float):
-                mjcf_kwargs["scale"] = [mjcf_kwargs["scale"] for _ in range(3)]
-            mjcf_kwargs["scale"] = [
-                mjcf_kwargs["scale"][ind] * object_scale[ind] for ind in range(3)
-            ]
+    _apply_object_scale(mjcf_kwargs, object_scale)
 
     groups_containing_sampled_obj = []
     for group, group_cats in OBJ_GROUPS.items():

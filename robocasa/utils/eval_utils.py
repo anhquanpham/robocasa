@@ -11,6 +11,13 @@ import numpy as np
 from tqdm import tqdm
 from termcolor import colored
 
+# Pass to ``robosuite.make`` / ``create_eval_env(..., **kwargs)`` for a single-switch pinned eval:
+# fixed scene, object identity, fixtures, distractor count, robot spawn, arm init noise; object xy
+# placement still varies (see ``Kitchen(..., pin_all_except_object_placement=True)``).
+PINNED_EVAL_EXCEPT_OBJECT_PLACEMENT = dict(
+    pin_all_except_object_placement=True,
+)
+
 
 def create_eval_env(
     env_name,
@@ -30,7 +37,22 @@ def create_eval_env(
     generative_textures=None,
     randomize_cameras=False,
     layout_and_style_ids=((1, 1), (2, 2), (4, 4), (6, 9), (7, 10)),
+    **extra_env_kwargs,
 ):
+    """
+    Create an environment for evaluation. Extra keyword arguments are forwarded to ``robosuite.make``
+    (and thus the task class).
+
+    **Pinned eval, random object positions only:** pass ``pin_all_except_object_placement=True`` (or unpack
+    ``PINNED_EVAL_EXCEPT_OBJECT_PLACEMENT`` from this module). That sets layout/style (1,1) unless you pass
+    ``layout_and_style_ids`` or ``layout_ids``/``style_ids``, and pins textures, cameras, object instances,
+    fixtures, distractor count, robot spawn, and arm init noise—while keeping object placement random.
+
+    Or set the same fields manually, e.g. ``layout_and_style_ids=[(1, 1)]``, ``lexicographic_object_order=True``,
+    ``deterministic_fixture_selection=True``, ``pinned_distractor_count=1``, etc.
+
+    Note: some atomic tasks still randomize non-placement behavior (e.g. knob or left/right) via ``env.rng``.
+    """
     controller_configs = load_controller_config(default_controller=controllers)
 
     env_kwargs = dict(
@@ -53,6 +75,7 @@ def create_eval_env(
         layout_and_style_ids=layout_and_style_ids,
         translucent_robot=False,
     )
+    env_kwargs.update(extra_env_kwargs)
 
     env = robosuite.make(**env_kwargs)
     return env

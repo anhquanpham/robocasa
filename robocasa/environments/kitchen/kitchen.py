@@ -207,6 +207,17 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
             wrist and agentview cameras
 
         clutter_mode (int): sets clutter level. default is 0.
+
+        lexicographic_object_order (bool): if True, object instances for task obj_groups are chosen
+            deterministically (first in lexicographic order that satisfies max_size), while placement
+            samplers still use the environment RNG so object/furniture positions can vary per episode.
+
+        deterministic_fixture_selection (bool): if True, ``get_fixture`` picks the lexicographically first
+            matching fixture name instead of ``rng.choice``, and robot base init uses the first valid fixture
+            by name. Use for pinned eval when multiple counters/cabinets match.
+
+        pinned_distractor_count (int or None): if set (0--3), atomic tasks that spawn random numbers of
+            counter distractors use this count instead of sampling ``rng.integers(1, 4)``.
     """
 
     EXCLUDE_LAYOUTS = []
@@ -409,7 +420,31 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
         update_fxtr_cfg_dict=None,
         use_cotraining_cameras=False,
         use_novel_instructions=False,
+        lexicographic_object_order=False,
+        deterministic_fixture_selection=False,
+        pinned_distractor_count=None,
+        pin_all_except_object_placement=False,
     ):
+        if pin_all_except_object_placement:
+            generative_textures = None
+            randomize_cameras = False
+            lexicographic_object_order = True
+            deterministic_fixture_selection = True
+            if pinned_distractor_count is None:
+                pinned_distractor_count = 1
+            robot_spawn_deviation_pos_x = 0.0
+            robot_spawn_deviation_pos_y = 0.0
+            robot_spawn_deviation_rot = 0.0
+            if (
+                layout_and_style_ids is None
+                and layout_ids is None
+                and style_ids is None
+            ):
+                layout_ids = 1
+                style_ids = 1
+            if initialization_noise == "default":
+                initialization_noise = {"magnitude": 0.0, "type": "gaussian"}
+
         self.init_robot_base_ref = init_robot_base_ref
 
         self.robot_spawn_deviation_pos_x = robot_spawn_deviation_pos_x
@@ -453,6 +488,11 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
         self.use_distractors = use_distractors
         self.translucent_robot = translucent_robot
         self.randomize_cameras = randomize_cameras
+        self.lexicographic_object_order = lexicographic_object_order
+        self.deterministic_fixture_selection = deterministic_fixture_selection
+        if pinned_distractor_count is not None:
+            assert 0 <= pinned_distractor_count <= 3
+        self.pinned_distractor_count = pinned_distractor_count
 
         if isinstance(robots, str):
             robots = [robots]
@@ -1623,6 +1663,7 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
             max_size=max_size,
             object_scale=object_scale,
             rotate_upright=rotate_upright,
+            lexicographic_object_order=self.lexicographic_object_order,
         )
 
     def get_fixture(
@@ -1702,12 +1743,13 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
 
             if len(matches) == 0:
                 return None
-            # sample random key
             if return_all:
                 return [self.fixtures[key] for key in matches]
+            if self.deterministic_fixture_selection:
+                key = sorted(matches)[0]
             else:
                 key = self.rng.choice(matches)
-                return self.fixtures[key]
+            return self.fixtures[key]
         else:
             ref_fixture = self.get_fixture(ref)
 
@@ -1742,6 +1784,8 @@ class Kitchen(ManipulationEnv, metaclass=KitchenEnvMeta):
                     for (fxtr, d) in zip(cand_fixtures, dists)
                     if d - min_dist < 0.10
                 ]
+                if self.deterministic_fixture_selection:
+                    return sorted(close_fixtures, key=lambda f: f.name)[0]
                 return self.rng.choice(close_fixtures)
 
     def register_fixture_ref(self, ref_name, fn_kwargs):
